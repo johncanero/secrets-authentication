@@ -14,8 +14,20 @@ app.use(bodyParser.urlencoded({
 }));
 
 
+// HOME ROUTE
+app.get("/", function(req, res){
+  res.render("home");
+});
 
+// LOGIN ROUTE
+app.get("/login", function(req, res) {
+  res.render("login");
+});
 
+// REGISTER ROUTE
+app.get("/register", function(req, res) {
+  res.render("register");
+});
 
 
 
