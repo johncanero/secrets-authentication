@@ -1,9 +1,11 @@
 //jshint esversion:6
 
+// essentials
 const express = require("express");
 const bodyParser = require("body-parser");
 const ejs = require("ejs");
 const mongoose = require("mongoose");
+const encrypt = require("mongoose-encryption");
 
 const app = express();
 
@@ -22,11 +24,16 @@ mongoose.connect("mongodb://localhost:27017/userDB", {
 });
 
 
-// MONGOOSE - USER SCHEMA
-const userSchema = mongoose.Schema({
+// MONGOOSE - USER SCHEMA AND MONGOOSE SCHEMA CLASS ENCRYPTION
+const userSchema = new mongoose.Schema ({
   email: String,
   password: String
 });
+
+// Secret String Instead of Two Keys
+const secret = "Thisisourlittlesecret"
+userSchema.plugin(encrypt, { secret: secret, encryptedFields: ['password'] });
+
 
 const User = new mongoose.model("User", userSchema);
 
