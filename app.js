@@ -7,6 +7,9 @@ const mongoose = require("mongoose");
 const session = require("express-session");
 const passport = require("passport");
 const passportLocalMongoose = require("passport-local-mongoose");
+const GoogleStrategy = require('passport-google-oauth20').Strategy;
+const findOrCreate = require('mongoose-findorcreate')
+
 
 
 // LEVEL 5: PASSPORT.JS TO ADD COOKIES AND SESSION - DELETE BCRYPT
@@ -64,12 +67,15 @@ mongoose.connect("mongodb://localhost:27017/userDB", {
 // MONGOOSE - USER SCHEMA AND MONGOOSE SCHEMA CLASS ENCRYPTION
 const userSchema = new mongoose.Schema ({
   email: String,
-  password: String
+  password: String,
+  googleId: String
 });
 
 
 // LEVEL 5: PASSPORT.JS TO ADD COOKIES AND SESSION - PASSPORT LOCAL
 userSchema.plugin(passportLocalMongoose);
+// LEVEL 6: OAuth 2.0 & HOW TO IMPLEMENT SIGN IN WITH GOOGLE - FINDorCREATE
+userSchema.plugin(findOrCreate);
 
 
 // LEVEL 3: REMOVE PLUGIN USER SCHEMA
@@ -80,15 +86,73 @@ const User = new mongoose.model("User", userSchema);
 // LEVEL 5: PASSPORT.JS TO ADD COOKIES AND SESSION - PASSPORT 
 passport.use(User.createStrategy());
 
-passport.serializeUser(User.serializeUser());
-passport.deserializeUser(User.deserializeUser());
+// passport.serializeUser(User.serializeUser());
+// passport.deserializeUser(User.deserializeUser());
 
+
+
+// LEVEL 6: OAuth 2.0 & HOW TO IMPLEMENT SIGN IN WITH GOOGLE - SERIALIZE AND DESERIALIZE
+passport.serializeUser(function(user, done) {
+  done(null, user._id);
+  // if you use Model.id as your idAttribute maybe you'd want
+  // done(null, user.id);
+});
+
+passport.deserializeUser(function(id, done) {
+User.findById(id, function(err, user) {
+  done(err, user);
+});
+});
+
+
+
+// LEVEL 6: OAuth 2.0 & HOW TO IMPLEMENT SIGN IN WITH GOOGLE
+passport.use(new GoogleStrategy({
+  clientID: process.env.CLIENT_ID,
+  clientSecret: process.env.CLIENT_SECRET,
+  callbackURL: "http://localhost:3000/auth/google/secrets",
+
+  // The next will pull user credentials using Google API
+  userProfileURL: "https://www.googleapis.com/oauth2/v3/userinfo",
+},
+function(accessToken, refreshToken, profile, cb) {
+  console.log(profile);
+  
+  User.findOrCreate({ googleId: profile.id }, function (err, user) {
+    return cb(err, user);
+  });
+}
+));
 
 
 // HOME ROUTE
 app.get("/", function (req, res) {
   res.render("home");
 });
+
+
+
+
+// LEVEL 6 - AUTH GOOGLE
+app.route("/auth/google").get(
+  passport.authenticate("google", {
+    scope: ["profile"],
+  })
+);
+
+
+
+// LEVEL 6 - GOOGLE
+app.get(
+  "/auth/google/secrets",
+  passport.authenticate("google", { failureRedirect: "/login" }),
+  function (req, res) {
+      // Successful authentication, redirect to secrets.
+    res.redirect("/secrets");
+  }
+);
+
+
 
 // LOGIN ROUTE
 app.get("/login", function (req, res) {
