@@ -4,9 +4,14 @@ const express = require("express");
 const bodyParser = require("body-parser");
 const ejs = require("ejs");
 const mongoose = require("mongoose");
-const md5 = require("md5");
+const bcrypt = require("bcrypt");
+const saltRounds = 10;
 
-// LEVEL 3: REMOVE MONGOOSE ENCRYPTION
+
+// LEVEL 4: SALTING AND HASHING - CHANGE MD5 TO BYCRYPT
+// const md5 = require("md5");
+
+// LEVEL 3: HASHING PASSWORDS -  REMOVE MONGOOSE ENCRYPTION
 // const encrypt = require("mongoose-encryption");
 
 
@@ -24,6 +29,8 @@ app.use(
     extended: true,
   })
 );
+
+
 
 // MONGOOSE CONNECT
 mongoose.connect("mongodb://localhost:27017/userDB", {
@@ -67,18 +74,26 @@ app.get("/register", function (req, res) {
 
 // POST METHOD = REGISTER ROUTE
 app.post("/register", function(req, res) {
-  const newUser = new User({
-    email: req.body.username,
-    // LEVEL 3: USE HASH FUNCTION MD5
-    password: md5(req.body.password)
-  });
 
-  newUser.save(function (err){
-    if (err) {
-      console.log(err);
-    } else {
-      res.render("secrets");
-    }
+  // LEVEL 4: BCRYPT HASH
+  bcrypt.hash(req.body.password, saltRounds, function(err, hash) {
+       // Store hash in your password DB.
+      const newUser = new User({
+      email: req.body.username,
+      // LEVEL 4: HASH PASSWORD
+      password: hash
+
+      // LEVEL 3: USE HASH FUNCTION MD5
+      // password: md5(req.body.password)
+    });
+  
+    newUser.save(function (err){
+      if (err) {
+        console.log(err);
+      } else {
+        res.render("secrets");
+      }
+    });
   });
 });
 
@@ -88,16 +103,19 @@ app.post("/register", function(req, res) {
 app.post("/login", function(req, res) {
   const username = req.body.username;
    // LEVEL 3: USE HASH FUNCTION MD5
-  const password = md5(req.body.password);
+  const password = req.body.password;
 
   User.findOne({email: username}, function(err, foundUser){
     if (err) {
       console.log(err);
     } else {
       if(foundUser) {
-        if(foundUser.password === password) {
-          res.render("secrets");
-        }
+        // BYCRYPT COMPATE METHOD
+        bcrypt.compare(password, foundUser.password, function(err, result) {
+          if (result === true) {
+            res.render("secrets");  
+          }
+      });
       }
     }
   });
