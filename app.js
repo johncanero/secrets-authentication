@@ -102,6 +102,7 @@ app.get("/register", function (req, res) {
 
 
 // LEVEL 5: PASSPORT.JS TO ADD COOKIES AND SESSION - DELETE POST METHOD REGISTER ROUTE 
+
 // POST METHOD = REGISTER ROUTE
 // app.post("/register", function(req, res) {
 
@@ -131,6 +132,7 @@ app.get("/register", function (req, res) {
 
 
 // LEVEL 5: PASSPORT.JS TO ADD COOKIES AND SESSION - DELETE POST METHOD LOG-IN ROUTE 
+
 // POST METHOD = LOGIN ROUTE
 // app.post("/login", function(req, res) {
 //   const username = req.body.username;
@@ -153,22 +155,66 @@ app.get("/register", function (req, res) {
 //   });
 // })
 
-
-
-app.post("/register", function(req, res) {
-
-
+app.get("/secrets", function (req, res) {
+  if (req.isAuthenticated()) {
+    res.render("secrets");
+  } else {
+    res.redirect("/login");
+  }
 });
 
 
 
-app.post("/login", function(req, res) {
 
+// LEVEL 5: PASSPORT.JS TO ADD COOKIES AND SESSION - PASSPORT AUTHENTICATION - REGISTER
+app.post("/register", function(req, res) {
+  User.register(
+    { username: req.body.username },
+    req.body.password,
+    function (err, user) {
+      if (err) {
+        console.log(err);
+        res.redirect("/register");
+      } else {
+        passport.authenticate("local")(req, res, function () {
+          res.redirect("/secrets");
+        });
+      }
+    }
+  );
+});
+
+
+
+
+// LEVEL 5: PASSPORT.JS TO ADD COOKIES AND SESSION - PASSPORT AUTHENTICATION - LOGIN
+app.post("/login", function(req, res) {
+  const user = new User({
+    username: req.body.username,
+    password: req.body.password,
+  });
+  req.login(user, function (err) {
+    if (err) {
+      console.log(err);
+    } else {
+      // Authenticates user using password and username
+      passport.authenticate("local");
+      res.redirect("/secrets");
+    }
+  });
 })
 
 
+// LEVEL 5: PASSPORT.JS TO ADD COOKIES AND SESSION - PASSPORT AUTHENTICATION - LOGOUT
+app.get("/logout", (req, res) => {
+  req.logout(req.user, err => {
+    if(err) return next(err);
+    res.redirect("/");
+  });
+});
 
-//TODO
+
+
 
 app.listen(3000, function () {
   console.log("Server started on port 3000");
