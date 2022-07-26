@@ -1,5 +1,5 @@
 //jshint esversion:6
-require('dotenv').config()
+require("dotenv").config();
 const express = require("express");
 const bodyParser = require("body-parser");
 const ejs = require("ejs");
@@ -7,29 +7,12 @@ const mongoose = require("mongoose");
 const session = require("express-session");
 const passport = require("passport");
 const passportLocalMongoose = require("passport-local-mongoose");
-const GoogleStrategy = require('passport-google-oauth20').Strategy;
-const findOrCreate = require('mongoose-findorcreate')
+const GoogleStrategy = require("passport-google-oauth20").Strategy;
+const FacebookStrategy = require("passport-facebook").Strategy;
+const findOrCreate = require("mongoose-findorcreate");
 
 
-
-// LEVEL 5: PASSPORT.JS TO ADD COOKIES AND SESSION - DELETE BCRYPT
-// const bcrypt = require("bcrypt");
-// const saltRounds = 10;
-
-
-// LEVEL 4: SALTING AND HASHING - CHANGE MD5 TO BYCRYPT
-// const md5 = require("md5");
-
-
-// LEVEL 3: HASHING PASSWORDS -  REMOVE MONGOOSE ENCRYPTION
-// const encrypt = require("mongoose-encryption");
-
-
-const app = express()
-
-// LEVEL 3: REMOVE PLUGIN USER SCHEMA
-// console.log(process.env.API_KEY);
-
+const app = express();
 
 
 app.use(express.static("public"));
@@ -44,7 +27,7 @@ app.use(
 // LEVEL 5: PASSPORT.JS TO ADD COOKIES AND SESSION - APP.USE SESSION and INITIALIZE PASSPORT
 app.use(
   session({
-    secret: "Our little secret.",
+    secret: "Our little secret.", 
     resave: false,
     saveUninitialized: false,
   })
@@ -59,70 +42,89 @@ app.use(passport.session());
 // MONGOOSE CONNECT
 mongoose.connect("mongodb://localhost:27017/userDB", {
   useNewUrlParser: true,
-  useUnifiedTopology: true,
+  useUnifiedTopology: true
+  }, err => {
+  if(err) throw err;
+  console.log('Connected to MongoDB')
 });
 
 
 
 // MONGOOSE - USER SCHEMA AND MONGOOSE SCHEMA CLASS ENCRYPTION
-const userSchema = new mongoose.Schema ({
+const userSchema = new mongoose.Schema({
   email: String,
   password: String,
-  googleId: String
+  googleId: String,
+  facebookId: String,
+  secret: String,
 });
 
 
+// PLUGIN
 // LEVEL 5: PASSPORT.JS TO ADD COOKIES AND SESSION - PASSPORT LOCAL
 userSchema.plugin(passportLocalMongoose);
 // LEVEL 6: OAuth 2.0 & HOW TO IMPLEMENT SIGN IN WITH GOOGLE - FINDorCREATE
 userSchema.plugin(findOrCreate);
 
 
-// LEVEL 3: REMOVE PLUGIN USER SCHEMA
-// userSchema.plugin(encrypt, { secret: process.env.SECRET, encryptedFields: ['password'] });
 const User = new mongoose.model("User", userSchema);
 
-
-// LEVEL 5: PASSPORT.JS TO ADD COOKIES AND SESSION - PASSPORT 
 passport.use(User.createStrategy());
 
-// passport.serializeUser(User.serializeUser());
-// passport.deserializeUser(User.deserializeUser());
-
-
-
-// LEVEL 6: OAuth 2.0 & HOW TO IMPLEMENT SIGN IN WITH GOOGLE - SERIALIZE AND DESERIALIZE
-passport.serializeUser(function(user, done) {
-  done(null, user._id);
-  // if you use Model.id as your idAttribute maybe you'd want
-  // done(null, user.id);
+passport.serializeUser(function (user, done) {
+  done(null, user.id);
 });
 
-passport.deserializeUser(function(id, done) {
-User.findById(id, function(err, user) {
-  done(err, user);
+passport.deserializeUser(function (id, done) {
+  User.findById(id, function (err, user) {
+    done(err, user);
+  });
 });
-});
+
+//passport.deserializeUser(function (user, done) {
+//  done(null, user);
+//});
 
 
-
+// Google
 // LEVEL 6: OAuth 2.0 & HOW TO IMPLEMENT SIGN IN WITH GOOGLE
-passport.use(new GoogleStrategy({
-  clientID: process.env.CLIENT_ID,
-  clientSecret: process.env.CLIENT_SECRET,
-  callbackURL: "http://localhost:3000/auth/google/secrets",
+passport.use(
+  new GoogleStrategy(
+    {
+      clientID: process.env.CLIENT_ID,
+      clientSecret: process.env.CLIENT_SECRET,
+      callbackURL: "http://localhost:3000/auth/google/secrets",
 
-  // The next will pull user credentials using Google API
-  userProfileURL: "https://www.googleapis.com/oauth2/v3/userinfo",
+      // The next will pull user credentials using Google API
+      userProfileURL: "https://www.googleapis.com/oauth2/v3/userinfo",
+    },
+
+    // Google sends a token which allows access to profile credentials
+    function (accessToken, refreshToken, profile, cb) {
+      console.log(profile);
+      // Either find a user, or create a new account.
+      User.findOrCreate({ googleId: profile.id }, function (err, user) {
+        return cb(err, user);
+      });
+    }
+  )
+);
+
+
+
+//* Facebook *//
+passport.use(new FacebookStrategy({
+  clientID: 346503394348987,
+  clientSecret: 'd4ba7cd4ae42587f29cf2040d4875c05',
+  callbackURL: "http://localhost:3000/auth/facebook/secrets",
 },
 function(accessToken, refreshToken, profile, cb) {
-  console.log(profile);
-  
-  User.findOrCreate({ googleId: profile.id }, function (err, user) {
+  User.findOrCreate({ facebookId: profile.id }, function (err, user) {
     return cb(err, user);
   });
 }
 ));
+
 
 
 // HOME ROUTE
@@ -133,25 +135,38 @@ app.get("/", function (req, res) {
 
 
 
-// LEVEL 6 - AUTH GOOGLE
+//* Google *//
+
 app.route("/auth/google").get(
   passport.authenticate("google", {
     scope: ["profile"],
   })
 );
 
-
-
-// LEVEL 6 - GOOGLE
 app.get(
   "/auth/google/secrets",
   passport.authenticate("google", { failureRedirect: "/login" }),
   function (req, res) {
-      // Successful authentication, redirect to secrets.
     res.redirect("/secrets");
   }
 );
 
+
+//* Facebook *//
+app.get('/auth/facebook',
+  passport.authenticate('facebook'));
+
+app.get('/auth/facebook/secrets',
+  passport.authenticate('facebook', { failureRedirect: '/login' }),
+  function(req, res) {
+    // Successful authentication, redirect home.
+    res.redirect("/secrets");
+  });
+
+
+
+
+  
 
 
 // LOGIN ROUTE
@@ -165,68 +180,50 @@ app.get("/register", function (req, res) {
 });
 
 
-// LEVEL 5: PASSPORT.JS TO ADD COOKIES AND SESSION - DELETE POST METHOD REGISTER ROUTE 
-
-// POST METHOD = REGISTER ROUTE
-// app.post("/register", function(req, res) {
-
-//   // LEVEL 4: BCRYPT HASH
-//   bcrypt.hash(req.body.password, saltRounds, function(err, hash) {
-//        // Store hash in your password DB.
-//       const newUser = new User({
-//       email: req.body.username,
-//       // LEVEL 4: HASH PASSWORD
-//       password: hash
-
-//       // LEVEL 3: USE HASH FUNCTION MD5
-//       // password: md5(req.body.password)
-//     });
-  
-//     newUser.save(function (err){
-//       if (err) {
-//         console.log(err);
-//       } else {
-//         res.render("secrets");
-//       }
-//     });
-//   });
-// });
+// SECRETS
 
 
+app.get("/secrets", function(req, res){
+  User.find({"secret": {$ne: null}}, function(err, foundUsers){
+    if (err){
+      console.log(err);
+    } else {
+      if (foundUsers) {
+        res.render("secrets", {usersWithSecrets: foundUsers});
+      }
+    }
+  });
+});
 
-
-// LEVEL 5: PASSPORT.JS TO ADD COOKIES AND SESSION - DELETE POST METHOD LOG-IN ROUTE 
-
-// POST METHOD = LOGIN ROUTE
-// app.post("/login", function(req, res) {
-//   const username = req.body.username;
-//    // LEVEL 3: USE HASH FUNCTION MD5
-//   const password = req.body.password;
-
-//   User.findOne({email: username}, function(err, foundUser){
-//     if (err) {
-//       console.log(err);
-//     } else {
-//       if(foundUser) {
-//         // BYCRYPT COMPATE METHOD
-//         bcrypt.compare(password, foundUser.password, function(err, result) {
-//           if (result === true) {
-//             res.render("secrets");  
-//           }
-//       });
-//       }
-//     }
-//   });
-// })
-
-app.get("/secrets", function (req, res) {
+// SUBMIT
+app.get("/submit", function (req, res) {
   if (req.isAuthenticated()) {
-    res.render("secrets");
+    res.render("submit");
   } else {
     res.redirect("/login");
   }
 });
 
+
+
+app.post("/submit", function (req, res) {
+  const submittedSecret = req.body.secret;
+
+  //console.log(req.user.id);
+
+  User.findById(req.user.id, function (err, foundUser) {
+    if (err) {
+      console.log(err);
+    } else {
+      if (foundUser) {
+        foundUser.secret = submittedSecret;
+        foundUser.save(function () {
+          res.redirect("/secrets");
+        });
+      }
+    }
+  });
+});
 
 
 
