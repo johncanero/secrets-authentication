@@ -86,6 +86,7 @@ passport.deserializeUser(function (id, done) {
 //});
 
 
+
 // Google
 // LEVEL 6: OAuth 2.0 & HOW TO IMPLEMENT SIGN IN WITH GOOGLE
 passport.use(
@@ -180,9 +181,7 @@ app.get("/register", function (req, res) {
 });
 
 
-// SECRETS
-
-
+// SECRETS ROUTE
 app.get("/secrets", function(req, res){
   User.find({"secret": {$ne: null}}, function(err, foundUsers){
     if (err){
@@ -195,7 +194,9 @@ app.get("/secrets", function(req, res){
   });
 });
 
-// SUBMIT
+
+
+// SUBMIT ROUTE
 app.get("/submit", function (req, res) {
   if (req.isAuthenticated()) {
     res.render("submit");
